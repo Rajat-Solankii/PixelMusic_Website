@@ -45,3 +45,6 @@ markdown.xml
 /AGENTS.md
 
 graphify-out/
+
+# Node.js dependencies
+node_modules/
