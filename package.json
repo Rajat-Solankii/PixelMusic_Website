@@ -4,7 +4,8 @@
   "description": "PixelMusic website - Free Ad-Free Hi-Res Music Player for Android",
   "private": true,
   "dependencies": {
-    "@vercel/analytics": "^2.0.1"
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.0"
   },
   "scripts": {
     "install-analytics": "npm install"
