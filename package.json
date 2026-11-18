@@ -1,0 +1,12 @@
+{
+  "name": "pixelmusic-website",
+  "version": "1.0.0",
+  "description": "PixelMusic website - Free Ad-Free Hi-Res Music Player for Android",
+  "private": true,
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
+  },
+  "scripts": {
+    "install-analytics": "npm install"
+  }
+}
