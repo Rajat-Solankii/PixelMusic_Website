@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wishes Admin · PixelMusic</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/site/favicon-32.png">
+<script>(function(){try{var t=localStorage.getItem('pm-theme');if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})()</script>
+<style>
+@font-face{font-family:"Google Sans Flex";src:url(/assets/site/gflex.woff2) format("woff2");font-weight:400 850;font-display:swap}
+:root{color-scheme:light;--bg:#fff7fa;--on-bg:#383038;--on-sv:#665c65;--sc:#f7eaf3;--sc-high:#f1e5ee;--sc-highest:#eddee9;--p:#78527c;--on-p:#fff7fa;--sec-c:#f4dbf2;--on-sec-c:#5e4c5e;--err-c:#ffdad6;--on-err-c:#93000a}
+html[data-theme="dark"]{color-scheme:dark;--bg:#110d11;--on-bg:#f0e1ec;--on-sv:#b4a7b1;--sc:#1e181e;--sc-high:#241e24;--sc-highest:#2b232b;--p:#e0bbe1;--on-p:#523656;--sec-c:#463647;--on-sec-c:#cfb8ce;--err-c:#93000a;--on-err-c:#ffdad6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--on-bg);font:400 16px/1.5 "Google Sans Flex",system-ui,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.8rem;font-weight:850;margin:0 0 6px}
+p.sub{color:var(--on-sv);margin:0 0 20px}
+.panel{background:var(--sc);border-radius:28px;padding:18px;margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+input{flex:1 1 220px;min-width:0;font:inherit;color:var(--on-bg);background:var(--sc-highest);border:2px solid transparent;border-radius:16px;padding:10px 14px;outline:none}
+input:focus{border-color:var(--p)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:999px;border:0;font:inherit;font-weight:700;cursor:pointer;transition:border-radius .2s}
+.btn:hover{border-radius:14px}
+.filled{background:var(--p);color:var(--on-p)}.tonal{background:var(--sec-c);color:var(--on-sec-c)}.danger{background:var(--err-c);color:var(--on-err-c)}
+.item{display:flex;gap:14px;align-items:flex-start;background:var(--sc-high);border-radius:22px;padding:14px 14px 14px 18px;margin-bottom:10px}
+.item .body{flex:1 1 auto;min-width:0}
+.item p{margin:0 0 6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.item small{color:var(--on-sv)}
+.status{min-height:1.4em;color:var(--on-sv);font-weight:600;margin-top:10px}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Wishes admin</h1>
+  <p class="sub">Hide any wish from the public wall. Hidden wishes are kept in the database and are not deleted.</p>
+
+  <form class="panel row" id="auth">
+    <input type="password" id="key" placeholder="Admin key (WISHES_ADMIN_KEY)" autocomplete="off" aria-label="Admin key">
+    <button class="btn filled" type="submit">Unlock</button>
+    <button class="btn tonal" type="button" id="refresh">Refresh</button>
+  </form>
+  <p class="status" id="status" role="status"></p>
+  <div id="list"></div>
+</main>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var key = '';
+  try { key = sessionStorage.getItem('wishes-admin-key') || ''; } catch(e) {}
+  $('key').value = key;
+
+  $('auth').addEventListener('submit', function(e){
+    e.preventDefault();
+    key = $('key').value.trim();
+    try { sessionStorage.setItem('wishes-admin-key', key); } catch(e) {}
+    load();
+  });
+  $('refresh').addEventListener('click', load);
+
+  function load(){
+    $('status').textContent = 'Loading…';
+    fetch('/api/wishes?limit=300', { cache: 'no-store' })
+      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(d){
+        var list = $('list'); list.textContent = '';
+        (d.wishes || []).forEach(function(w){
+          var item = document.createElement('div'); item.className = 'item';
+          var body = document.createElement('div'); body.className = 'body';
+          var p = document.createElement('p'); p.textContent = w.message;
+          var s = document.createElement('small');
+          s.textContent = w.name + ' · ' + w.platform + ' · ' + new Date(w.createdAt).toLocaleString();
+          body.appendChild(p); body.appendChild(s);
+          var b = document.createElement('button'); b.className = 'btn danger'; b.type = 'button'; b.textContent = 'Hide';
+          b.addEventListener('click', function(){ hide(w.id, item, b); });
+          item.appendChild(body); item.appendChild(b);
+          list.appendChild(item);
+        });
+        $('status').textContent = (d.count || 0) + ' visible wishes. The public wall may take up to 20 seconds to update.';
+      })
+      .catch(function(){ $('status').textContent = 'Could not load wishes.'; });
+  }
+
+  function hide(id, item, btn){
+    if (!key) { $('status').textContent = 'Enter the admin key first.'; return; }
+    if (!confirm('Hide this wish from the public wall?')) return;
+    btn.disabled = true;
+    fetch('/api/wishes?id=' + encodeURIComponent(id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + key } })
+      .then(function(r){
+        if (r.status === 401) throw new Error('Wrong admin key.');
+        if (!r.ok) throw new Error('Could not hide that wish.');
+        item.remove(); $('status').textContent = 'Wish hidden.';
+      })
+      .catch(function(err){ btn.disabled = false; $('status').textContent = err.message; });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
