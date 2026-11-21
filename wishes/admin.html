@@ -5,96 +5,212 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wishes Admin · PixelMusic</title>
 <meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/site/favicon-32.png">
 <script>(function(){try{var t=localStorage.getItem('pm-theme');if(t!=='dark'&&t!=='light')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})()</script>
 <style>
 @font-face{font-family:"Google Sans Flex";src:url(/assets/site/gflex.woff2) format("woff2");font-weight:400 850;font-display:swap}
-:root{color-scheme:light;--bg:#fff7fa;--on-bg:#383038;--on-sv:#665c65;--sc:#f7eaf3;--sc-high:#f1e5ee;--sc-highest:#eddee9;--p:#78527c;--on-p:#fff7fa;--sec-c:#f4dbf2;--on-sec-c:#5e4c5e;--err-c:#ffdad6;--on-err-c:#93000a}
-html[data-theme="dark"]{color-scheme:dark;--bg:#110d11;--on-bg:#f0e1ec;--on-sv:#b4a7b1;--sc:#1e181e;--sc-high:#241e24;--sc-highest:#2b232b;--p:#e0bbe1;--on-p:#523656;--sec-c:#463647;--on-sec-c:#cfb8ce;--err-c:#93000a;--on-err-c:#ffdad6}
+:root{color-scheme:light;--bg:#fff7fa;--on-bg:#383038;--on-sv:#665c65;--sc:#f7eaf3;--sc-high:#f1e5ee;--sc-highest:#eddee9;--p:#78527c;--on-p:#fff7fa;--pc:#f5c5f7;--on-pc:#603c65;--sec-c:#f4dbf2;--on-sec-c:#5e4c5e;--err:#ba1a1a;--err-c:#ffdad6;--on-err-c:#93000a}
+html[data-theme="dark"]{color-scheme:dark;--bg:#110d11;--on-bg:#f0e1ec;--on-sv:#b4a7b1;--sc:#1e181e;--sc-high:#241e24;--sc-highest:#2b232b;--p:#e0bbe1;--on-p:#523656;--pc:#664869;--on-pc:#fed7ff;--sec-c:#463647;--on-sec-c:#cfb8ce;--err:#ffb4ab;--err-c:#93000a;--on-err-c:#ffdad6}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--on-bg);font:400 16px/1.5 "Google Sans Flex",system-ui,sans-serif}
 .wrap{max-width:860px;margin:0 auto;padding:24px 16px 48px}
 h1{font-size:1.8rem;font-weight:850;margin:0 0 6px}
 p.sub{color:var(--on-sv);margin:0 0 20px}
-.panel{background:var(--sc);border-radius:28px;padding:18px;margin-bottom:16px}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-input{flex:1 1 220px;min-width:0;font:inherit;color:var(--on-bg);background:var(--sc-highest);border:2px solid transparent;border-radius:16px;padding:10px 14px;outline:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input{min-width:0;font:inherit;color:var(--on-bg);background:var(--sc-highest);border:2px solid transparent;border-radius:16px;padding:12px 14px;outline:none}
 input:focus{border-color:var(--p)}
-.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:999px;border:0;font:inherit;font-weight:700;cursor:pointer;transition:border-radius .2s}
-.btn:hover{border-radius:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 18px;border-radius:999px;border:0;font:inherit;font-weight:700;cursor:pointer;transition:border-radius .2s;white-space:nowrap}
+.btn:hover{border-radius:14px}.btn[disabled]{opacity:.55;cursor:default}
 .filled{background:var(--p);color:var(--on-p)}.tonal{background:var(--sec-c);color:var(--on-sec-c)}.danger{background:var(--err-c);color:var(--on-err-c)}
+.lock{max-width:440px;margin:12vh auto 0;text-align:center}
+.lock .icon{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:24px;background:var(--pc);color:var(--on-pc);font-size:34px}
+.lock form{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.lock input{width:100%;text-align:center}
+.err{color:var(--err);font-weight:650;min-height:1.5em;margin:4px 0 0}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .item{display:flex;gap:14px;align-items:flex-start;background:var(--sc-high);border-radius:22px;padding:14px 14px 14px 18px;margin-bottom:10px}
 .item .body{flex:1 1 auto;min-width:0}
 .item p{margin:0 0 6px;white-space:pre-wrap;overflow-wrap:anywhere}
 .item small{color:var(--on-sv)}
-.status{min-height:1.4em;color:var(--on-sv);font-weight:600;margin-top:10px}
+.status{min-height:1.4em;color:var(--on-sv);font-weight:600;margin:0 0 12px}
+.panel{background:var(--sc);border-radius:28px;padding:18px 20px;margin-bottom:18px}
+.ph{font-size:1.15rem;font-weight:800;margin:0}
+.seg{display:flex;flex-wrap:wrap;gap:6px;background:var(--sc-highest);border-radius:999px;padding:5px;width:fit-content;max-width:100%}
+.seg-b{border:0;background:transparent;color:var(--on-bg);font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;cursor:pointer;transition:background .2s,border-radius .2s}
+.seg-b:hover{background:var(--sec-c)}
+.seg-b[aria-checked="true"]{background:var(--p);color:var(--on-p)}
+.seg-b[disabled]{opacity:.6;cursor:default}
+.hint{color:var(--on-sv);font-size:.9rem;margin:10px 4px 0;min-height:1.3em}
+[hidden]{display:none!important}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <h1>Wishes admin</h1>
-  <p class="sub">Hide any wish from the public wall. Hidden wishes are kept in the database and are not deleted.</p>
+  <!-- Locked: only the password prompt is shown until the server accepts the password. -->
+  <section class="lock" id="locked">
+    <div class="icon" aria-hidden="true">🔒</div>
+    <h1>Wishes admin</h1>
+    <p class="sub">Enter the admin password to manage the birthday wishes.</p>
+    <form id="auth" autocomplete="off">
+      <input type="password" id="pw" placeholder="Admin password" aria-label="Admin password" autocomplete="current-password" required>
+      <button class="btn filled" id="unlock" type="submit">Unlock</button>
+      <p class="err" id="err" role="alert"></p>
+    </form>
+  </section>
 
-  <form class="panel row" id="auth">
-    <input type="password" id="key" placeholder="Admin key (WISHES_ADMIN_KEY)" autocomplete="off" aria-label="Admin key">
-    <button class="btn filled" type="submit">Unlock</button>
-    <button class="btn tonal" type="button" id="refresh">Refresh</button>
-  </form>
-  <p class="status" id="status" role="status"></p>
-  <div id="list"></div>
+  <!-- Unlocked -->
+  <section id="unlocked" hidden>
+    <div class="bar">
+      <div>
+        <h1>Wishes admin</h1>
+        <p class="sub" style="margin:0">Hide any wish from the public wall. Hidden wishes stay in the database.</p>
+      </div>
+      <div class="row">
+        <button class="btn tonal" type="button" id="refresh">Refresh</button>
+        <button class="btn filled" type="button" id="lockBtn">Lock</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2 class="ph">🎂 Birthday mode on the home page</h2>
+      <p class="sub" style="margin:4px 0 12px">Shows the birthday banner and wishes wall at the top of www.pixelmusic.me.</p>
+      <div class="seg" role="radiogroup" aria-label="Birthday mode">
+        <button type="button" class="seg-b" data-mode="auto" role="radio">Auto · Dec 14 only</button>
+        <button type="button" class="seg-b" data-mode="on" role="radio">On now</button>
+        <button type="button" class="seg-b" data-mode="off" role="radio">Off</button>
+      </div>
+      <p class="hint" id="modeHint"></p>
+    </div>
+    <p class="status" id="status" role="status"></p>
+    <div id="list"></div>
+  </section>
 </main>
 <script>
 (function(){
   var $ = function(id){ return document.getElementById(id); };
-  var key = '';
-  try { key = sessionStorage.getItem('wishes-admin-key') || ''; } catch(e) {}
-  $('key').value = key;
+  // The password lives only in memory: reloading or closing the tab locks the page again.
+  var password = '';
+  var ERR = {
+    unauthorized: 'Wrong password.',
+    locked: 'Too many wrong attempts. Try again in an hour.',
+    admin_not_configured: 'Admin password is not set up yet (WISHES_ADMIN_KEY in Vercel).',
+    not_configured: 'The wishes database is not connected.'
+  };
+
+  function api(url, opts){
+    opts = opts || {};
+    opts.cache = 'no-store';
+    opts.headers = { Authorization: 'Bearer ' + password, Accept: 'application/json' };
+    if (opts.contentType) { opts.headers['Content-Type'] = opts.contentType; delete opts.contentType; }
+    return fetch(url, opts).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(d){
+        if (!r.ok) { var e = new Error(d.error || 'server_error'); e.status = r.status; throw e; }
+        return d;
+      });
+    });
+  }
+
+  function lock(message){
+    password = '';
+    $('list').textContent = '';
+    $('unlocked').hidden = true;
+    $('locked').hidden = false;
+    $('pw').value = '';
+    $('err').textContent = message || '';
+    $('pw').focus();
+  }
 
   $('auth').addEventListener('submit', function(e){
     e.preventDefault();
-    key = $('key').value.trim();
-    try { sessionStorage.setItem('wishes-admin-key', key); } catch(e) {}
-    load();
+    var pw = $('pw').value;
+    if (!pw) return;
+    password = pw;
+    $('unlock').disabled = true; $('err').textContent = '';
+    api('/api/wishes?admin=1').then(function(d){
+      $('pw').value = '';
+      $('locked').hidden = true;
+      $('unlocked').hidden = false;
+      render(d);
+      loadMode();
+    }).catch(function(err){
+      password = '';
+      $('pw').select();
+      $('err').textContent = ERR[err.message] || 'Could not reach the server. Try again.';
+    }).then(function(){ $('unlock').disabled = false; });
   });
-  $('refresh').addEventListener('click', load);
+
+  $('lockBtn').addEventListener('click', function(){ lock(''); });
+  $('refresh').addEventListener('click', function(){ load(); loadMode(); });
 
   function load(){
     $('status').textContent = 'Loading…';
-    fetch('/api/wishes?limit=300', { cache: 'no-store' })
-      .then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function(d){
-        var list = $('list'); list.textContent = '';
-        (d.wishes || []).forEach(function(w){
-          var item = document.createElement('div'); item.className = 'item';
-          var body = document.createElement('div'); body.className = 'body';
-          var p = document.createElement('p'); p.textContent = w.message;
-          var s = document.createElement('small');
-          s.textContent = w.name + ' · ' + w.platform + ' · ' + new Date(w.createdAt).toLocaleString();
-          body.appendChild(p); body.appendChild(s);
-          var b = document.createElement('button'); b.className = 'btn danger'; b.type = 'button'; b.textContent = 'Hide';
-          b.addEventListener('click', function(){ hide(w.id, item, b); });
-          item.appendChild(body); item.appendChild(b);
-          list.appendChild(item);
-        });
-        $('status').textContent = (d.count || 0) + ' visible wishes. The public wall may take up to 20 seconds to update.';
-      })
-      .catch(function(){ $('status').textContent = 'Could not load wishes.'; });
+    api('/api/wishes?admin=1').then(render).catch(function(err){
+      if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+      $('status').textContent = 'Could not load wishes.';
+    });
   }
+
+  function render(d){
+    var list = $('list'); list.textContent = '';
+    (d.wishes || []).forEach(function(w){
+      var item = document.createElement('div'); item.className = 'item';
+      var body = document.createElement('div'); body.className = 'body';
+      var p = document.createElement('p'); p.textContent = w.message;
+      var s = document.createElement('small');
+      s.textContent = w.name + ' · ' + (w.platform === 'android' ? 'app' : 'web') + ' · ' + new Date(w.createdAt).toLocaleString();
+      body.appendChild(p); body.appendChild(s);
+      var b = document.createElement('button'); b.className = 'btn danger'; b.type = 'button'; b.textContent = 'Hide';
+      b.addEventListener('click', function(){ hide(w.id, item, b); });
+      item.appendChild(body); item.appendChild(b);
+      list.appendChild(item);
+    });
+    var n = d.count || 0;
+    $('status').textContent = n + (n === 1 ? ' visible wish.' : ' visible wishes.') + ' The public wall may take up to 20 seconds to update.';
+  }
+
+  // ---- birthday mode switch
+  var MODE_HINT = {
+    auto: 'Shows automatically on December 14th (in each visitor’s local time), hidden on other days.',
+    on: 'Birthday mode is showing on the home page right now.',
+    off: 'Birthday mode is hidden, even on December 14th.'
+  };
+  var segs = Array.prototype.slice.call(document.querySelectorAll('.seg-b'));
+  function showMode(mode){
+    segs.forEach(function(b){ b.setAttribute('aria-checked', String(b.dataset.mode === mode)); });
+    $('modeHint').textContent = (MODE_HINT[mode] || '') + (mode ? ' Visitors see changes within about 30 seconds.' : '');
+  }
+  function loadMode(){
+    api('/api/wishes?config=1&t=' + Date.now()).then(function(d){ showMode(d.mode); })
+      .catch(function(){ $('modeHint').textContent = 'Could not load the current birthday mode.'; });
+  }
+  segs.forEach(function(b){
+    b.addEventListener('click', function(){
+      var mode = b.dataset.mode;
+      segs.forEach(function(x){ x.disabled = true; });
+      api('/api/wishes?config=1', { method: 'PUT', body: JSON.stringify({ mode: mode }), contentType: 'application/json' })
+        .then(function(d){ showMode(d.mode); })
+        .catch(function(err){
+          if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+          $('modeHint').textContent = 'Could not change the birthday mode.';
+        })
+        .then(function(){ segs.forEach(function(x){ x.disabled = false; }); });
+    });
+  });
 
   function hide(id, item, btn){
-    if (!key) { $('status').textContent = 'Enter the admin key first.'; return; }
     if (!confirm('Hide this wish from the public wall?')) return;
     btn.disabled = true;
-    fetch('/api/wishes?id=' + encodeURIComponent(id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + key } })
-      .then(function(r){
-        if (r.status === 401) throw new Error('Wrong admin key.');
-        if (!r.ok) throw new Error('Could not hide that wish.');
-        item.remove(); $('status').textContent = 'Wish hidden.';
-      })
-      .catch(function(err){ btn.disabled = false; $('status').textContent = err.message; });
+    api('/api/wishes?id=' + encodeURIComponent(id), { method: 'DELETE' })
+      .then(function(){ item.remove(); $('status').textContent = 'Wish hidden.'; })
+      .catch(function(err){
+        if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+        btn.disabled = false; $('status').textContent = 'Could not hide that wish.';
+      });
   }
 
-  load();
+  // Remove the password the previous version of this page kept in session storage.
+  try { sessionStorage.removeItem('wishes-admin-key'); } catch(e) {}
+  $('pw').focus();
 })();
 </script>
 </body>

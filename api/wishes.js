@@ -3,6 +3,9 @@
 //   GET    /api/wishes            -> { count, wishes: [{ id, name, message, platform, createdAt }] }
 //   POST   /api/wishes            -> { wish }      body: { name?, message, platform?, appVersion?, website? }
 //   DELETE /api/wishes?id=<id>    -> { ok: true }  header: Authorization: Bearer <WISHES_ADMIN_KEY>
+//   GET    /api/wishes?admin=1    -> same as GET, password required (admin page sign-in)
+//   GET    /api/wishes?config=1   -> { mode: "auto" | "on" | "off" }   birthday mode of the main page
+//   PUT    /api/wishes?config=1   -> { mode }      body: { mode }, password required
 //
 // Storage: Upstash Redis over its REST API (no npm dependencies). Add "Upstash for Redis"
 // from the Vercel Storage tab; it injects KV_REST_API_URL / KV_REST_API_TOKEN (or the
@@ -162,8 +165,55 @@ async function createWish(req, res) {
   return send(res, 201, { wish: { id, name, message, platform, createdAt } });
 }
 
+const ADMIN_MAX_FAILS_PER_HOUR = 10;
+
+/**
+ * Verifies the admin password (WISHES_ADMIN_KEY) from `Authorization: Bearer <password>`.
+ * After 10 wrong attempts from one IP in an hour, that IP is locked out for the hour.
+ * Returns null when OK, otherwise the error response has already been sent.
+ */
+async function requireAdmin(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+  if (!ADMIN_KEY) return send(res, 503, { error: "admin_not_configured" });
+  const failKey = PREFIX + "adminfail:" + hashIp(clientIp(req));
+  const [fails] = await redis([["GET", failKey]]);
+  if (Number(fails) >= ADMIN_MAX_FAILS_PER_HOUR) return send(res, 429, { error: "locked" });
+  if (isAdmin(req)) return null;
+  await redis([["INCR", failKey], ["EXPIRE", failKey, "3600", "NX"]]);
+  return send(res, 401, { error: "unauthorized" });
+}
+
+// Birthday mode for the main page: "auto" = December 14th only, "on" = always, "off" = never.
+const MODE_KEY = PREFIX + "mode";
+const MODES = ["auto", "on", "off"];
+
+async function getConfig(req, res) {
+  const [mode] = await redis([["GET", MODE_KEY]]);
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=15, stale-while-revalidate=30");
+  return send(res, 200, { mode: MODES.includes(mode) ? mode : "auto" });
+}
+
+async function setConfig(req, res) {
+  if ((await requireAdmin(req, res)) !== null) return;
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (_) {
+    return send(res, 400, { error: "invalid_body" });
+  }
+  if (!MODES.includes(body.mode)) return send(res, 400, { error: "invalid_mode" });
+  await redis([["SET", MODE_KEY, body.mode]]);
+  return send(res, 200, { mode: body.mode });
+}
+
+async function adminList(req, res) {
+  if ((await requireAdmin(req, res)) !== null) return;
+  const data = await listWishes(300);
+  return send(res, 200, data);
+}
+
 async function hideWish(req, res) {
-  if (!isAdmin(req)) return send(res, 401, { error: "unauthorized" });
+  if ((await requireAdmin(req, res)) !== null) return;
   const id = String((req.query && req.query.id) || "").trim();
   if (!/^[a-z0-9]{6,40}$/.test(id)) return send(res, 400, { error: "invalid_id" });
   await redis([["ZREM", INDEX_KEY, id], ["SADD", HIDDEN_KEY, id]]);
@@ -172,7 +222,7 @@ async function hideWish(req, res) {
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", SITE_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "OPTIONS") {
@@ -183,15 +233,19 @@ module.exports = async function handler(req, res) {
   if (!REDIS_URL || !REDIS_TOKEN) return send(res, 503, { error: "not_configured" });
 
   try {
+    const q = req.query || {};
+    if (req.method === "GET" && q.config) return await getConfig(req, res);
+    if (req.method === "PUT" && q.config) return await setConfig(req, res);
+    if (req.method === "GET" && q.admin) return await adminList(req, res);
     if (req.method === "GET") {
       const limit = Math.min(Math.max(parseInt((req.query && req.query.limit) || "150", 10) || 150, 1), 300);
       const data = await listWishes(limit);
-      res.setHeader("Cache-Control", "public, s-maxage=20, stale-while-revalidate=60");
+      res.setHeader("Cache-Control", "public, max-age=0, s-maxage=20, stale-while-revalidate=60");
       return send(res, 200, data);
     }
     if (req.method === "POST") return await createWish(req, res);
     if (req.method === "DELETE") return await hideWish(req, res);
-    res.setHeader("Allow", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("Allow", "GET, POST, PUT, DELETE, OPTIONS");
     return send(res, 405, { error: "method_not_allowed" });
   } catch (err) {
     console.error("[wishes]", err);

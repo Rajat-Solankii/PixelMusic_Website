@@ -1,46 +1,64 @@
-# Birthday wishes wall (www.pixelmusic.me/wishes)
+# Birthday mode and wishes wall
 
-Wishes sent from the Android app's December 14th popup, or from the web form, appear on
-`https://www.pixelmusic.me/wishes`.
+On December 14th the home page (`www.pixelmusic.me`) turns into a birthday page: a celebration
+banner, the live wishes wall, a "Send a wish" form and a "Give a gift" button (opens the
+site's Ko-fi / UPI Support dialog) appear at the top, with a "🎂 Wishes" link in the nav.
+Wishes from the Android app's December 14th popup land on the same wall.
 
-## Files (copy these into the repo Vercel deploys)
+## Files
 
 | Path | What it is |
 |---|---|
-| `api/wishes.js` | Vercel function: `GET` list, `POST` new wish, `DELETE ?id=` hide (admin) |
-| `wishes/index.html` | Public wishes wall + "Send a wish" form + gift (Ko-fi / UPI) |
-| `wishes/admin.html` | Team page to hide wishes (needs the admin key) |
+| `birthday/birthday.js` | Decides whether birthday mode is on and builds the section (loaded by `index.html`) |
+| `birthday/birthday.css` | Styles for the birthday section, loaded only when it's on |
+| `api/wishes.js` | Vercel function: wishes list/add/hide and the birthday mode setting |
+| `wishes/admin.html` | Password-protected admin page: birthday mode switch + hide wishes |
+| `wishes/index.html` | Redirect from the old `/wishes` address to `/#wishes` |
 
-No `package.json` or build step needed: the function has no dependencies.
+`index.html` only has one added line: `<script src="/birthday/birthday.js" defer></script>`.
+No build step or npm dependency is needed.
 
 ## One-time setup in Vercel
 
 1. **Storage → Upstash for Redis → Connect** to `pixel-music-website` (all environments).
    This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
-2. **Settings → Environment Variables → add `WISHES_ADMIN_KEY`** with a long random value
-   (e.g. a password-manager generated 32+ characters). Mark it *Sensitive*.
-3. Redeploy, then check `https://www.pixelmusic.me/api/wishes` returns `{"count":0,"wishes":[]}`.
+2. **Settings → Environment Variables → add `WISHES_ADMIN_KEY`**: this is the admin page
+   password. Mark it *Sensitive*. Never commit it to this (public) repo.
+3. Redeploy. `https://www.pixelmusic.me/api/wishes` should return `{"count":0,"wishes":[]}`.
+
+## Admin page: `https://www.pixelmusic.me/wishes/admin.html`
+
+Shows only a password box until the server accepts the password (kept in memory only;
+reloading or **Lock** signs out). 10 wrong passwords from one IP lock that IP out for an hour.
+
+- **Birthday mode**
+  - **Auto · Dec 14 only** (default): on during December 14th in each visitor's local time.
+  - **On now**: shows the birthday page immediately, on any day.
+  - **Off**: hidden, even on December 14th.
+  Visitors see a change within about 30 seconds.
+- **Hide** removes a wish from the wall (it stays in Redis, not deleted).
+
+Preview the birthday page on any day, whatever the mode: `https://www.pixelmusic.me/?birthday`
 
 ## Moderation
 
-- Wishes go live instantly. The API blocks common abusive words (English + Hindi), links,
-  empty messages and bots (honeypot), and allows 20 wishes per hour per IP.
-- To remove one: open `/wishes/admin.html`, enter the admin key, click **Hide**.
-  Hidden wishes stay in Redis (not deleted). The wall updates within ~20 seconds.
+Wishes go live instantly. The API blocks common abusive words (English + Hindi), links,
+empty messages and bots (honeypot), and allows 20 wishes per hour per IP.
 
 ## Free tier usage
 
-- The app sends exactly one request per wish. It never polls.
-- The wall's list is cached on Vercel's CDN for 20 s, so most page views never run the
-  function. Open tabs refresh every 30 s and stop after 20 minutes.
-- Each wish costs 4 Redis commands; each uncached list read costs 2–3.
+- The app sends one request per wish and never polls.
+- The mode and wishes list are cached on Vercel's CDN (15–20 s), so most page views don't run
+  the function. Open tabs refresh the wall every 30 s and stop after 20 minutes.
+- Each wish costs 4 Redis commands; each uncached read costs 1–3.
 
 ## API
 
 ```
-POST /api/wishes   {"name":"Rajat","message":"Happy birthday!","platform":"android"}
-  201 {"wish":{...}}
-  422 {"error":"message_required" | "not_kind" | "no_links"}
-  429 {"error":"slow_down"}
-  503 {"error":"not_configured"}   (Upstash not connected yet)
+GET    /api/wishes             {count, wishes}
+POST   /api/wishes             {name?, message, platform?}  -> 201 {wish} | 422 | 429 | 503
+DELETE /api/wishes?id=<id>     hide a wish            (Authorization: Bearer <password>)
+GET    /api/wishes?admin=1     list, password check   (Authorization: Bearer <password>)
+GET    /api/wishes?config=1    {mode: "auto" | "on" | "off"}
+PUT    /api/wishes?config=1    {mode}                 (Authorization: Bearer <password>)
 ```
