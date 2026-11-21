@@ -4,8 +4,8 @@
 //   POST   /api/wishes            -> { wish }      body: { name?, message, platform?, appVersion?, website? }
 //   DELETE /api/wishes?id=<id>    -> { ok: true }  permanently deletes, header: Authorization: Bearer <WISHES_ADMIN_PASSWORD>
 //   GET    /api/wishes?admin=1    -> same as GET, password required (admin page sign-in)
-//   GET    /api/wishes?config=1   -> { mode: "auto" | "on" | "off" }   birthday mode of the main page
-//   PUT    /api/wishes?config=1   -> { mode }      body: { mode }, password required
+//   GET    /api/wishes?config=1   -> { mode: "auto" | "on" | "off", date: "MM-DD" }  birthday mode (website + app)
+//   PUT    /api/wishes?config=1   -> { mode, date }  body: { mode?, date? }, password required
 //
 // Storage: Upstash Redis over its REST API (no npm dependencies). Add "Upstash for Redis"
 // from the Vercel Storage tab; it injects KV_REST_API_URL / KV_REST_API_TOKEN (or the
@@ -183,14 +183,33 @@ async function requireAdmin(req, res) {
   return send(res, 401, { error: "unauthorized" });
 }
 
-// Birthday mode for the main page: "auto" = December 14th only, "on" = always, "off" = never.
+// Birthday mode, shared by the website and the Android app:
+//   mode "auto" = only on `date` (MM-DD, every year), "on" = now, "off" = never.
 const MODE_KEY = PREFIX + "mode";
+const DATE_KEY = PREFIX + "date";
 const MODES = ["auto", "on", "off"];
+const DEFAULT_DATE = "12-14";
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+function validDate(d) {
+  const m = /^(\d{2})-(\d{2})$/.exec(String(d || ""));
+  if (!m) return false;
+  const month = +m[1], day = +m[2];
+  return month >= 1 && month <= 12 && day >= 1 && day <= DAYS_IN_MONTH[month - 1];
+}
+
+async function readConfig() {
+  const [mode, date] = await redis([["GET", MODE_KEY], ["GET", DATE_KEY]]);
+  return {
+    mode: MODES.includes(mode) ? mode : "auto",
+    date: validDate(date) ? date : DEFAULT_DATE,
+  };
+}
 
 async function getConfig(req, res) {
-  const [mode] = await redis([["GET", MODE_KEY]]);
+  const config = await readConfig();
   res.setHeader("Cache-Control", "public, max-age=0, s-maxage=15, stale-while-revalidate=30");
-  return send(res, 200, { mode: MODES.includes(mode) ? mode : "auto" });
+  return send(res, 200, config);
 }
 
 async function setConfig(req, res) {
@@ -201,9 +220,18 @@ async function setConfig(req, res) {
   } catch (_) {
     return send(res, 400, { error: "invalid_body" });
   }
-  if (!MODES.includes(body.mode)) return send(res, 400, { error: "invalid_mode" });
-  await redis([["SET", MODE_KEY, body.mode]]);
-  return send(res, 200, { mode: body.mode });
+  const commands = [];
+  if (body.mode !== undefined) {
+    if (!MODES.includes(body.mode)) return send(res, 400, { error: "invalid_mode" });
+    commands.push(["SET", MODE_KEY, body.mode]);
+  }
+  if (body.date !== undefined) {
+    if (!validDate(body.date)) return send(res, 400, { error: "invalid_date" });
+    commands.push(["SET", DATE_KEY, body.date]);
+  }
+  if (!commands.length) return send(res, 400, { error: "nothing_to_change" });
+  await redis(commands);
+  return send(res, 200, await readConfig());
 }
 
 async function adminList(req, res) {

@@ -1,7 +1,8 @@
 // Birthday mode for the PixelMusic landing page.
 // Shows a celebration banner, the wishes wall, a "Send a wish" form and a gift button at the top
 // of the page when birthday mode is active:
-//   - mode "auto" (default): only on December 14th (visitor's local date)
+//   - mode "auto" (default): only on the celebration date set by the team (MM-DD, every year,
+//     visitor's local date; December 14th unless changed)
 //   - mode "on" / "off": set by the team from /wishes/admin.html
 //   - ?birthday in the URL previews it on any day
 (function () {
@@ -10,14 +11,21 @@
   var ACCENTS = ['a-purple', 'a-pink', 'a-blue', 'a-green', 'a-yellow', 'a-orange', 'a-teal', 'a-red'];
   var forced = /[?&]birthday\b/.test(location.search);
 
-  function isBirthdayToday() { var d = new Date(); return d.getMonth() === 11 && d.getDate() === 14; }
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var celebration = '12-14';
+  function isBirthdayToday(mmdd) {
+    var p = String(mmdd || '12-14').split('-'), d = new Date();
+    return d.getMonth() + 1 === +p[0] && d.getDate() === +p[1];
+  }
+  function dateLabel(mmdd) { var p = mmdd.split('-'); return MONTHS[+p[0] - 1] + ' ' + (+p[1]); }
 
   fetch(API + '?config=1', { cache: 'no-cache', headers: { Accept: 'application/json' } })
     .then(function (r) { return r.ok ? r.json() : { mode: 'auto' }; })
     .catch(function () { return { mode: 'auto' }; })
     .then(function (c) {
       var mode = c && c.mode;
-      var on = forced || mode === 'on' || (mode !== 'off' && isBirthdayToday());
+      if (c && /^\d{2}-\d{2}$/.test(c.date)) celebration = c.date;
+      var on = forced || mode === 'on' || (mode !== 'off' && isBirthdayToday(celebration));
       if (!on) return;
       if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
       else start();
@@ -51,7 +59,7 @@
       '<div class="wrap bd-hero">' +
         '<canvas aria-hidden="true"></canvas>' +
         '<div class="bd-badge" aria-hidden="true"><svg viewBox="0 0 200 200"><defs><linearGradient id="bd-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7aa8"/><stop offset=".5" stop-color="#ffc94d"/><stop offset="1" stop-color="#b388ff"/></linearGradient></defs><path fill="url(#bd-g)" d="M100 6c12 0 20 13 32 16s26-3 34 6 3 24 8 35 18 19 18 37-13 24-18 36-1 26-8 34-23 4-34 8-19 18-32 18-21-13-32-17-27 0-34-9-3-23-8-34S6 115 6 100s13-25 18-36 1-27 8-35 23-3 34-7S88 6 100 6Z"/></svg><span>🎂</span></div>' +
-        '<span class="bd-eyebrow">December 14 · A little surprise</span>' +
+        '<span class="bd-eyebrow">' + dateLabel(celebration) + ' · A little surprise</span>' +
         '<h2 class="bd-title" id="bd-title">Celebrating the birthday of <span class="hl">Anshul Yadav</span>! 🎉</h2>' +
         '<p class="bd-lead">He has been working tirelessly on PixelMusic for the past 12 months. To appreciate his dedication and motivate the team, we’ve planned a little surprise. Leave him a wish!</p>' +
         '<div class="bd-actions">' +

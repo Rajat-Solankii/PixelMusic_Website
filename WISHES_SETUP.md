@@ -31,11 +31,14 @@ No build step or npm dependency is needed.
 Shows only a password box until the server accepts the password (kept in memory only;
 reloading or **Lock** signs out). 10 wrong passwords from one IP lock that IP out for an hour.
 
-- **Birthday mode**
-  - **Auto · Dec 14 only** (default): on during December 14th in each visitor's local time.
-  - **On now**: shows the birthday page immediately, on any day.
-  - **Off**: hidden, even on December 14th.
-  Visitors see a change within about 30 seconds.
+- **Celebration date**: pick any date and **Save date**; it repeats every year
+  (default December 14th).
+- **Birthday mode** (website banner + Android app popup)
+  - **Auto** (default): on during the celebration date in each visitor's local time.
+  - **On now**: shows the birthday page and app popup immediately, on any day.
+  - **Off**: hidden, even on the celebration date.
+  The website updates within about 30 seconds; the app checks at most once an hour and
+  shows the popup at most once a day.
 - **Delete** permanently removes a wish from the wall and the database. It can't be undone.
 
 Preview the birthday page on any day, whatever the mode: `https://www.pixelmusic.me/?birthday`
@@ -59,6 +62,6 @@ GET    /api/wishes             {count, wishes}
 POST   /api/wishes             {name?, message, platform?}  -> 201 {wish} | 422 | 429 | 503
 DELETE /api/wishes?id=<id>     delete a wish          (Authorization: Bearer <password>)
 GET    /api/wishes?admin=1     list, password check   (Authorization: Bearer <password>)
-GET    /api/wishes?config=1    {mode: "auto" | "on" | "off"}
-PUT    /api/wishes?config=1    {mode}                 (Authorization: Bearer <password>)
+GET    /api/wishes?config=1    {mode: "auto" | "on" | "off", date: "MM-DD"}
+PUT    /api/wishes?config=1    {mode?, date?}         (Authorization: Bearer <password>)
 ```

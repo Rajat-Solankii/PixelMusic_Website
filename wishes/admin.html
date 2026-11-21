@@ -42,6 +42,10 @@ input:focus{border-color:var(--p)}
 .seg-b[aria-checked="true"]{background:var(--p);color:var(--on-p)}
 .seg-b[disabled]{opacity:.6;cursor:default}
 .hint{color:var(--on-sv);font-size:.9rem;margin:10px 4px 0;min-height:1.3em}
+.date-row{margin-bottom:16px}
+.date-row label{display:block;font-weight:700;font-size:.9rem;margin:0 0 8px 4px}
+.date-row input[type=date]{flex:0 1 220px;color-scheme:inherit}
+.date-row .hint{margin-top:6px}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -72,10 +76,18 @@ input:focus{border-color:var(--p)}
       </div>
     </div>
     <div class="panel">
-      <h2 class="ph">🎂 Birthday mode on the home page</h2>
-      <p class="sub" style="margin:4px 0 12px">Shows the birthday banner and wishes wall at the top of www.pixelmusic.me.</p>
+      <h2 class="ph">🎂 Birthday mode</h2>
+      <p class="sub" style="margin:4px 0 12px">Controls the birthday banner and wishes wall on www.pixelmusic.me and the birthday popup in the Android app.</p>
+      <div class="date-row">
+        <label for="bdDate">Celebration date <span style="font-weight:500;color:var(--on-sv)">(repeats every year)</span></label>
+        <div class="row">
+          <input type="date" id="bdDate" aria-describedby="dateHint">
+          <button type="button" class="btn tonal" id="saveDate">Save date</button>
+        </div>
+        <p class="hint" id="dateHint"></p>
+      </div>
       <div class="seg" role="radiogroup" aria-label="Birthday mode">
-        <button type="button" class="seg-b" data-mode="auto" role="radio">Auto · Dec 14 only</button>
+        <button type="button" class="seg-b" data-mode="auto" role="radio">Auto · <span id="autoLabel">Dec 14</span> only</button>
         <button type="button" class="seg-b" data-mode="on" role="radio">On now</button>
         <button type="button" class="seg-b" data-mode="off" role="radio">Off</button>
       </div>
@@ -168,33 +180,54 @@ input:focus{border-color:var(--p)}
     $('status').textContent = n + (n === 1 ? ' visible wish.' : ' visible wishes.') + ' The public wall may take up to 20 seconds to update.';
   }
 
-  // ---- birthday mode switch
-  var MODE_HINT = {
-    auto: 'Shows automatically on December 14th (in each visitor’s local time), hidden on other days.',
-    on: 'Birthday mode is showing on the home page right now.',
-    off: 'Birthday mode is hidden, even on December 14th.'
-  };
+  // ---- birthday mode switch + celebration date (shared by the website and the app)
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var current = { mode: 'auto', date: '12-14' };
+  function prettyDate(mmdd){ var p = mmdd.split('-'); return MONTHS[+p[0] - 1] + ' ' + (+p[1]); }
+  function modeHint(mode, date){
+    var d = prettyDate(date);
+    return ({
+      auto: 'Shows automatically on ' + d + ' every year (each visitor’s local date), hidden on other days.',
+      on: 'Birthday mode is on right now, on the website and in the app.',
+      off: 'Birthday mode is off, even on ' + d + '.'
+    })[mode] || '';
+  }
   var segs = Array.prototype.slice.call(document.querySelectorAll('.seg-b'));
-  function showMode(mode){
-    segs.forEach(function(b){ b.setAttribute('aria-checked', String(b.dataset.mode === mode)); });
-    $('modeHint').textContent = (MODE_HINT[mode] || '') + (mode ? ' Visitors see changes within about 30 seconds.' : '');
+  function showConfig(c){
+    current = { mode: c.mode, date: c.date || '12-14' };
+    segs.forEach(function(b){ b.setAttribute('aria-checked', String(b.dataset.mode === current.mode)); });
+    $('autoLabel').textContent = prettyDate(current.date);
+    // The picker needs a full date; any year works since only month and day are used.
+    $('bdDate').value = new Date().getFullYear() + '-' + current.date;
+    $('modeHint').textContent = modeHint(current.mode, current.date) +
+      ' The website updates within about 30 seconds; the app checks at most once an hour.';
   }
   function loadMode(){
-    api('/api/wishes?config=1&t=' + Date.now()).then(function(d){ showMode(d.mode); })
+    api('/api/wishes?config=1&t=' + Date.now()).then(showConfig)
       .catch(function(){ $('modeHint').textContent = 'Could not load the current birthday mode.'; });
+  }
+  function save(change, onError){
+    var controls = segs.concat([$('saveDate')]);
+    controls.forEach(function(x){ x.disabled = true; });
+    return api('/api/wishes?config=1', { method: 'PUT', body: JSON.stringify(change), contentType: 'application/json' })
+      .then(showConfig)
+      .catch(function(err){
+        if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+        onError(err);
+      })
+      .then(function(){ controls.forEach(function(x){ x.disabled = false; }); });
   }
   segs.forEach(function(b){
     b.addEventListener('click', function(){
-      var mode = b.dataset.mode;
-      segs.forEach(function(x){ x.disabled = true; });
-      api('/api/wishes?config=1', { method: 'PUT', body: JSON.stringify({ mode: mode }), contentType: 'application/json' })
-        .then(function(d){ showMode(d.mode); })
-        .catch(function(err){
-          if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
-          $('modeHint').textContent = 'Could not change the birthday mode.';
-        })
-        .then(function(){ segs.forEach(function(x){ x.disabled = false; }); });
+      save({ mode: b.dataset.mode }, function(){ $('modeHint').textContent = 'Could not change the birthday mode.'; });
     });
+  });
+  $('saveDate').addEventListener('click', function(){
+    var v = $('bdDate').value; // YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) { $('dateHint').textContent = 'Pick a date first.'; return; }
+    $('dateHint').textContent = '';
+    save({ date: v.slice(5) }, function(){ $('dateHint').textContent = 'Could not save that date.'; })
+      .then(function(){ if (!$('dateHint').textContent) $('dateHint').textContent = 'Saved: ' + prettyDate(current.date) + ' every year.'; });
   });
 
   function remove(id, item, btn){
