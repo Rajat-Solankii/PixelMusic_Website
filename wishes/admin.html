@@ -64,7 +64,7 @@ input:focus{border-color:var(--p)}
     <div class="bar">
       <div>
         <h1>Wishes admin</h1>
-        <p class="sub" style="margin:0">Hide any wish from the public wall. Hidden wishes stay in the database.</p>
+        <p class="sub" style="margin:0">Delete any wish from the public wall. Deleting is permanent.</p>
       </div>
       <div class="row">
         <button class="btn tonal" type="button" id="refresh">Refresh</button>
@@ -93,7 +93,7 @@ input:focus{border-color:var(--p)}
   var ERR = {
     unauthorized: 'Wrong password.',
     locked: 'Too many wrong attempts. Try again in an hour.',
-    admin_not_configured: 'Admin password is not set up yet (WISHES_ADMIN_KEY in Vercel).',
+    admin_not_configured: 'Admin password is not set up yet (WISHES_ADMIN_PASSWORD in Vercel).',
     not_configured: 'The wishes database is not connected.'
   };
 
@@ -159,8 +159,8 @@ input:focus{border-color:var(--p)}
       var s = document.createElement('small');
       s.textContent = w.name + ' · ' + (w.platform === 'android' ? 'app' : 'web') + ' · ' + new Date(w.createdAt).toLocaleString();
       body.appendChild(p); body.appendChild(s);
-      var b = document.createElement('button'); b.className = 'btn danger'; b.type = 'button'; b.textContent = 'Hide';
-      b.addEventListener('click', function(){ hide(w.id, item, b); });
+      var b = document.createElement('button'); b.className = 'btn danger'; b.type = 'button'; b.textContent = 'Delete';
+      b.addEventListener('click', function(){ remove(w.id, item, b); });
       item.appendChild(body); item.appendChild(b);
       list.appendChild(item);
     });
@@ -197,14 +197,14 @@ input:focus{border-color:var(--p)}
     });
   });
 
-  function hide(id, item, btn){
-    if (!confirm('Hide this wish from the public wall?')) return;
+  function remove(id, item, btn){
+    if (!confirm('Delete this wish permanently? This can’t be undone.')) return;
     btn.disabled = true;
     api('/api/wishes?id=' + encodeURIComponent(id), { method: 'DELETE' })
-      .then(function(){ item.remove(); $('status').textContent = 'Wish hidden.'; })
+      .then(function(){ item.remove(); $('status').textContent = 'Wish deleted.'; })
       .catch(function(err){
         if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
-        btn.disabled = false; $('status').textContent = 'Could not hide that wish.';
+        btn.disabled = false; $('status').textContent = 'Could not delete that wish.';
       });
   }
 

@@ -11,8 +11,8 @@ Wishes from the Android app's December 14th popup land on the same wall.
 |---|---|
 | `birthday/birthday.js` | Decides whether birthday mode is on and builds the section (loaded by `index.html`) |
 | `birthday/birthday.css` | Styles for the birthday section, loaded only when it's on |
-| `api/wishes.js` | Vercel function: wishes list/add/hide and the birthday mode setting |
-| `wishes/admin.html` | Password-protected admin page: birthday mode switch + hide wishes |
+| `api/wishes.js` | Vercel function: wishes list/add/delete and the birthday mode setting |
+| `wishes/admin.html` | Password-protected admin page: birthday mode switch + delete wishes |
 | `wishes/index.html` | Redirect from the old `/wishes` address to `/#wishes` |
 
 `index.html` only has one added line: `<script src="/birthday/birthday.js" defer></script>`.
@@ -22,8 +22,8 @@ No build step or npm dependency is needed.
 
 1. **Storage → Upstash for Redis → Connect** to `pixel-music-website` (all environments).
    This adds `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
-2. **Settings → Environment Variables → add `WISHES_ADMIN_KEY`**: this is the admin page
-   password. Mark it *Sensitive*. Never commit it to this (public) repo.
+2. **Settings → Environment Variables → add `WISHES_ADMIN_PASSWORD`**: this is the admin
+   page password. Mark it *Sensitive*. Never commit it to this (public) repo.
 3. Redeploy. `https://www.pixelmusic.me/api/wishes` should return `{"count":0,"wishes":[]}`.
 
 ## Admin page: `https://www.pixelmusic.me/wishes/admin.html`
@@ -36,7 +36,7 @@ reloading or **Lock** signs out). 10 wrong passwords from one IP lock that IP ou
   - **On now**: shows the birthday page immediately, on any day.
   - **Off**: hidden, even on December 14th.
   Visitors see a change within about 30 seconds.
-- **Hide** removes a wish from the wall (it stays in Redis, not deleted).
+- **Delete** permanently removes a wish from the wall and the database. It can't be undone.
 
 Preview the birthday page on any day, whatever the mode: `https://www.pixelmusic.me/?birthday`
 
@@ -57,7 +57,7 @@ empty messages and bots (honeypot), and allows 20 wishes per hour per IP.
 ```
 GET    /api/wishes             {count, wishes}
 POST   /api/wishes             {name?, message, platform?}  -> 201 {wish} | 422 | 429 | 503
-DELETE /api/wishes?id=<id>     hide a wish            (Authorization: Bearer <password>)
+DELETE /api/wishes?id=<id>     delete a wish          (Authorization: Bearer <password>)
 GET    /api/wishes?admin=1     list, password check   (Authorization: Bearer <password>)
 GET    /api/wishes?config=1    {mode: "auto" | "on" | "off"}
 PUT    /api/wishes?config=1    {mode}                 (Authorization: Bearer <password>)

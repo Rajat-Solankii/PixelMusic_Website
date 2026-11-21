@@ -2,7 +2,7 @@
 //
 //   GET    /api/wishes            -> { count, wishes: [{ id, name, message, platform, createdAt }] }
 //   POST   /api/wishes            -> { wish }      body: { name?, message, platform?, appVersion?, website? }
-//   DELETE /api/wishes?id=<id>    -> { ok: true }  header: Authorization: Bearer <WISHES_ADMIN_KEY>
+//   DELETE /api/wishes?id=<id>    -> { ok: true }  permanently deletes, header: Authorization: Bearer <WISHES_ADMIN_PASSWORD>
 //   GET    /api/wishes?admin=1    -> same as GET, password required (admin page sign-in)
 //   GET    /api/wishes?config=1   -> { mode: "auto" | "on" | "off" }   birthday mode of the main page
 //   PUT    /api/wishes?config=1   -> { mode }      body: { mode }, password required
@@ -14,19 +14,19 @@
 // Env vars:
 //   KV_REST_API_URL / UPSTASH_REDIS_REST_URL       (required)
 //   KV_REST_API_TOKEN / UPSTASH_REDIS_REST_TOKEN   (required)
-//   WISHES_ADMIN_KEY   long random string for the admin page (required to hide wishes)
+//   WISHES_ADMIN_PASSWORD   admin page password (required to delete wishes and switch birthday mode)
 //   WISHES_SALT        optional, salts the hashed IP used only for rate limiting
 
 const crypto = require("crypto");
 
 const REDIS_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
-const ADMIN_KEY = process.env.WISHES_ADMIN_KEY || "";
+// WISHES_ADMIN_KEY is the old name, still accepted so an existing setup keeps working.
+const ADMIN_KEY = process.env.WISHES_ADMIN_PASSWORD || process.env.WISHES_ADMIN_KEY || "";
 const SALT = process.env.WISHES_SALT || REDIS_TOKEN || "pixelmusic";
 
 const PREFIX = "bday:anshul:";
 const INDEX_KEY = PREFIX + "index"; // sorted set: id -> createdAt
-const HIDDEN_KEY = PREFIX + "hidden"; // set of hidden ids (record kept for recovery)
 const wishKey = (id) => PREFIX + "wish:" + id;
 
 const MAX_NAME = 40;
@@ -36,7 +36,7 @@ const RATE_LIMIT_PER_HOUR = 20; // per hashed IP; generous because Jio/Airtel CG
 const DEFAULT_NAME = "A PixelMusic listener";
 const SITE_ORIGIN = "https://www.pixelmusic.me";
 
-// Small, deliberately conservative filter. Admins can hide anything it misses.
+// Small, deliberately conservative filter. Admins can delete anything it misses.
 const BLOCKED_WORDS = [
   "fuck", "fucking", "shit", "bitch", "bastard", "asshole", "dick", "cunt", "slut", "whore",
   "nigger", "nigga", "faggot", "retard", "madarchod", "behenchod", "bhenchod", "chutiya",
@@ -168,7 +168,7 @@ async function createWish(req, res) {
 const ADMIN_MAX_FAILS_PER_HOUR = 10;
 
 /**
- * Verifies the admin password (WISHES_ADMIN_KEY) from `Authorization: Bearer <password>`.
+ * Verifies the admin password (WISHES_ADMIN_PASSWORD) from `Authorization: Bearer <password>`.
  * After 10 wrong attempts from one IP in an hour, that IP is locked out for the hour.
  * Returns null when OK, otherwise the error response has already been sent.
  */
@@ -212,11 +212,11 @@ async function adminList(req, res) {
   return send(res, 200, data);
 }
 
-async function hideWish(req, res) {
+async function deleteWish(req, res) {
   if ((await requireAdmin(req, res)) !== null) return;
   const id = String((req.query && req.query.id) || "").trim();
   if (!/^[a-z0-9]{6,40}$/.test(id)) return send(res, 400, { error: "invalid_id" });
-  await redis([["ZREM", INDEX_KEY, id], ["SADD", HIDDEN_KEY, id]]);
+  await redis([["ZREM", INDEX_KEY, id], ["DEL", wishKey(id)]]);
   return send(res, 200, { ok: true });
 }
 
@@ -244,7 +244,7 @@ module.exports = async function handler(req, res) {
       return send(res, 200, data);
     }
     if (req.method === "POST") return await createWish(req, res);
-    if (req.method === "DELETE") return await hideWish(req, res);
+    if (req.method === "DELETE") return await deleteWish(req, res);
     res.setHeader("Allow", "GET, POST, PUT, DELETE, OPTIONS");
     return send(res, 405, { error: "method_not_allowed" });
   } catch (err) {
