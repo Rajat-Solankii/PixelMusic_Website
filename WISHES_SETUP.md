@@ -41,6 +41,12 @@ reloading or **Lock** signs out). 10 wrong passwords from one IP lock that IP ou
   shows the popup at most once a day.
 - **Delete** permanently removes a wish from the wall and the database. It can't be undone.
 
+- **App announcements**: write a title and message (optional button text + https link and a
+  "popup until" date) and **Publish to app**. Every app user gets a system notification within
+  a few hours, a popup the first time they open the app afterwards, and the announcement stays
+  in the app's announcements inbox (bookmark button on the home screen, with an unread dot).
+  **Delete** removes one from the inbox. Up to 30 are kept.
+
 Preview the birthday page on any day, whatever the mode: `https://www.pixelmusic.me/?birthday`
 
 ## Moderation
@@ -64,4 +70,6 @@ DELETE /api/wishes?id=<id>     delete a wish          (Authorization: Bearer <pa
 GET    /api/wishes?admin=1     list, password check   (Authorization: Bearer <password>)
 GET    /api/wishes?config=1    {mode: "auto" | "on" | "off", date: "MM-DD"}
 PUT    /api/wishes?config=1    {mode?, date?}         (Authorization: Bearer <password>)
+PUT    /api/wishes?announcement=1     publish {title, message, buttonLabel?, buttonUrl?, until?}
+DELETE /api/wishes?announcement=<id>  delete an announcement   (both need the password)
 ```

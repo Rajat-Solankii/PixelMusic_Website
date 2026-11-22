@@ -42,6 +42,14 @@ input:focus{border-color:var(--p)}
 .seg-b[aria-checked="true"]{background:var(--p);color:var(--on-p)}
 .seg-b[disabled]{opacity:.6;cursor:default}
 .hint{color:var(--on-sv);font-size:.9rem;margin:10px 4px 0;min-height:1.3em}
+.ann-form label{display:block;font-weight:700;font-size:.9rem;margin:12px 0 6px 4px}
+.ann-form input,.ann-form textarea{width:100%;font:inherit;color:var(--on-bg);background:var(--sc-highest);border:2px solid transparent;border-radius:16px;padding:10px 14px;outline:none;resize:vertical}
+.ann-form input:focus,.ann-form textarea:focus{border-color:var(--p)}
+.ann-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 12px}
+.opt{font-weight:500;color:var(--on-sv)}
+.live-ann{background:var(--sc-high);border-radius:20px;padding:12px 16px;font-size:.92rem}
+.live-ann b{display:block;margin-bottom:2px}
+.live-ann p{margin:0;white-space:pre-wrap;color:var(--on-sv)}
 .date-row{margin-bottom:16px}
 .date-row label{display:block;font-weight:700;font-size:.9rem;margin:0 0 8px 4px}
 .date-row input[type=date]{flex:0 1 220px;color-scheme:inherit}
@@ -92,6 +100,36 @@ input:focus{border-color:var(--p)}
         <button type="button" class="seg-b" data-mode="off" role="radio">Off</button>
       </div>
       <p class="hint" id="modeHint"></p>
+    </div>
+    <div class="panel">
+      <h2 class="ph">📣 App announcements</h2>
+      <p class="sub" style="margin:4px 0 12px">New announcements send a notification to app users, show once as a popup the next time they open the app, and stay in the app's announcements inbox (🔖 on the home screen). The app checks a few times a day.</p>
+      <form id="annForm" class="ann-form" autocomplete="off">
+        <label for="annTitle">Title</label>
+        <input type="text" id="annTitle" maxlength="80" placeholder="New update is out!" required>
+        <label for="annMsg">Message</label>
+        <textarea id="annMsg" maxlength="600" rows="4" placeholder="What do you want to tell everyone?" required></textarea>
+        <div class="ann-grid">
+          <div>
+            <label for="annBtn">Button text <span class="opt">(optional)</span></label>
+            <input type="text" id="annBtn" maxlength="30" placeholder="Download">
+          </div>
+          <div>
+            <label for="annUrl">Button link <span class="opt">(https, optional)</span></label>
+            <input type="url" id="annUrl" maxlength="300" placeholder="https://www.pixelmusic.me">
+          </div>
+          <div>
+            <label for="annUntil">Show until <span class="opt">(optional)</span></label>
+            <input type="date" id="annUntil">
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn filled" type="submit" id="annPublish">Publish to app</button>
+        </div>
+        <p class="hint" id="annHint"></p>
+      </form>
+      <h3 class="ph" style="font-size:1rem;margin:18px 0 8px">Published announcements</h3>
+      <div id="annList"></div>
     </div>
     <p class="status" id="status" role="status"></p>
     <div id="list"></div>
@@ -202,8 +240,60 @@ input:focus{border-color:var(--p)}
     $('modeHint').textContent = modeHint(current.mode, current.date) +
       ' The website updates within about 30 seconds; the app checks at most once an hour.';
   }
+  // ---- app announcement
+  var ANN_ERR = {
+    title_required: 'Add a title.', message_required: 'Add a message.',
+    invalid_url: 'The button link must start with https://',
+    button_label_required: 'Add button text for the link.', invalid_until: 'Pick a valid date.'
+  };
+  function showAnnouncements(list){
+    var box = $('annList'); box.textContent = '';
+    if (!list || !list.length) {
+      var empty = document.createElement('div'); empty.className = 'live-ann';
+      empty.textContent = 'No announcements yet.'; box.appendChild(empty); return;
+    }
+    list.forEach(function(a, i){
+      var item = document.createElement('div'); item.className = 'item';
+      var body = document.createElement('div'); body.className = 'body';
+      var b = document.createElement('b'); b.textContent = (i === 0 ? 'Newest · ' : '') + a.title;
+      var p = document.createElement('p'); p.textContent = a.message;
+      var s = document.createElement('small');
+      s.textContent = 'Published ' + new Date(a.publishedAt).toLocaleString() +
+        (a.until ? ' · popup until ' + a.until : '') + (a.buttonUrl ? ' · button: ' + a.buttonLabel + ' → ' + a.buttonUrl : '');
+      body.appendChild(b); body.appendChild(p); body.appendChild(s);
+      var del = document.createElement('button'); del.className = 'btn danger'; del.type = 'button'; del.textContent = 'Delete';
+      del.addEventListener('click', function(){
+        if (!confirm('Delete this announcement from the app inbox? Users who haven’t seen it won’t get it.')) return;
+        del.disabled = true;
+        api('/api/wishes?announcement=' + encodeURIComponent(a.id), { method: 'DELETE' })
+          .then(function(d){ showAnnouncements(d.announcements); $('annHint').textContent = 'Announcement deleted.'; })
+          .catch(function(err){
+            if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+            del.disabled = false; $('annHint').textContent = 'Could not delete the announcement.';
+          });
+      });
+      item.appendChild(body); item.appendChild(del);
+      box.appendChild(item);
+    });
+  }
+  $('annForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    if (!confirm('Publish this announcement to every app user?')) return;
+    $('annPublish').disabled = true; $('annHint').textContent = 'Publishing…';
+    api('/api/wishes?announcement=1', { method: 'PUT', contentType: 'application/json', body: JSON.stringify({
+      title: $('annTitle').value, message: $('annMsg').value, buttonLabel: $('annBtn').value,
+      buttonUrl: $('annUrl').value, until: $('annUntil').value
+    }) }).then(function(d){
+      showAnnouncements(d.announcements);
+      ['annTitle', 'annMsg', 'annBtn', 'annUrl', 'annUntil'].forEach(function(id){ $(id).value = ''; });
+      $('annHint').textContent = 'Published. App users get a notification within a few hours and a popup the next time they open the app.';
+    }).catch(function(err){
+      if (err.status === 401 || err.status === 429) return lock(ERR[err.message]);
+      $('annHint').textContent = ANN_ERR[err.message] || 'Could not publish the announcement.';
+    }).then(function(){ $('annPublish').disabled = false; });
+  });
   function loadMode(){
-    api('/api/wishes?config=1&t=' + Date.now()).then(showConfig)
+    api('/api/wishes?config=1&t=' + Date.now()).then(function(d){ showConfig(d); showAnnouncements(d.announcements); })
       .catch(function(){ $('modeHint').textContent = 'Could not load the current birthday mode.'; });
   }
   function save(change, onError){

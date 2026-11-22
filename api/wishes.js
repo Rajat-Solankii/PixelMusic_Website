@@ -6,6 +6,10 @@
 //   GET    /api/wishes?admin=1    -> same as GET, password required (admin page sign-in)
 //   GET    /api/wishes?config=1   -> { mode: "auto" | "on" | "off", date: "MM-DD" }  birthday mode (website + app)
 //   PUT    /api/wishes?config=1   -> { mode, date }  body: { mode?, date? }, password required
+//          GET ?config=1 also returns `announcements` (newest first: { id, title, message,
+//          buttonLabel, buttonUrl, until, publishedAt }) and `announcement` (the newest, or null).
+//   PUT    /api/wishes?announcement=1     -> publish   body: { title, message, buttonLabel?, buttonUrl?, until? }
+//   DELETE /api/wishes?announcement=<id>  -> delete that announcement (both password required)
 //
 // Storage: Upstash Redis over its REST API (no npm dependencies). Add "Upstash for Redis"
 // from the Vercel Storage tab; it injects KV_REST_API_URL / KV_REST_API_TOKEN (or the
@@ -198,11 +202,34 @@ function validDate(d) {
   return month >= 1 && month <= 12 && day >= 1 && day <= DAYS_IN_MONTH[month - 1];
 }
 
+// App announcements, newest first (up to MAX_ANNOUNCEMENTS). The Android app keeps them in
+// its announcements inbox, notifies users about new ones and shows the newest once as a popup.
+// Each publish gets a new id, so republishing the same text counts as a new announcement.
+const ANNOUNCEMENTS_KEY = "app:announcements";
+const MAX_ANNOUNCEMENTS = 30;
+const MAX_TITLE = 80;
+const MAX_ANNOUNCEMENT = 600;
+const MAX_BUTTON_LABEL = 30;
+const MAX_URL = 300;
+
+function readAnnouncements(raw) {
+  if (!raw) return [];
+  try {
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list.filter((a) => a && a.id && a.title) : [];
+  } catch (_) {
+    return [];
+  }
+}
+
 async function readConfig() {
-  const [mode, date] = await redis([["GET", MODE_KEY], ["GET", DATE_KEY]]);
+  const [mode, date, ann] = await redis([["GET", MODE_KEY], ["GET", DATE_KEY], ["GET", ANNOUNCEMENTS_KEY]]);
+  const announcements = readAnnouncements(ann);
   return {
     mode: MODES.includes(mode) ? mode : "auto",
     date: validDate(date) ? date : DEFAULT_DATE,
+    announcement: announcements[0] || null, // newest, kept for older app builds
+    announcements,
   };
 }
 
@@ -210,6 +237,50 @@ async function getConfig(req, res) {
   const config = await readConfig();
   res.setHeader("Cache-Control", "public, max-age=0, s-maxage=15, stale-while-revalidate=30");
   return send(res, 200, config);
+}
+
+async function publishAnnouncement(req, res) {
+  if ((await requireAdmin(req, res)) !== null) return;
+  let body;
+  try {
+    body = await readBody(req);
+  } catch (_) {
+    return send(res, 400, { error: "invalid_body" });
+  }
+  const title = clean(body.title, MAX_TITLE).replace(/\n/g, " ");
+  const message = clean(body.message, MAX_ANNOUNCEMENT);
+  const buttonLabel = clean(body.buttonLabel, MAX_BUTTON_LABEL).replace(/\n/g, " ");
+  const buttonUrl = String(body.buttonUrl || "").trim().slice(0, MAX_URL);
+  const until = String(body.until || "").trim();
+
+  if (!title) return send(res, 400, { error: "title_required" });
+  if (!message) return send(res, 400, { error: "message_required" });
+  if (buttonUrl && !/^https:\/\/[^\s"<>]+$/i.test(buttonUrl)) return send(res, 400, { error: "invalid_url" });
+  if (buttonUrl && !buttonLabel) return send(res, 400, { error: "button_label_required" });
+  if (until && !/^\d{4}-\d{2}-\d{2}$/.test(until)) return send(res, 400, { error: "invalid_until" });
+
+  const announcement = {
+    id: Date.now().toString(36),
+    title,
+    message,
+    buttonLabel: buttonUrl ? buttonLabel : "",
+    buttonUrl,
+    until,
+    publishedAt: Date.now(),
+  };
+  const [raw] = await redis([["GET", ANNOUNCEMENTS_KEY]]);
+  const announcements = [announcement, ...readAnnouncements(raw)].slice(0, MAX_ANNOUNCEMENTS);
+  await redis([["SET", ANNOUNCEMENTS_KEY, JSON.stringify(announcements)]]);
+  return send(res, 200, { announcement, announcements });
+}
+
+async function deleteAnnouncement(req, res) {
+  if ((await requireAdmin(req, res)) !== null) return;
+  const id = String((req.query && req.query.announcement) || "").trim();
+  const [raw] = await redis([["GET", ANNOUNCEMENTS_KEY]]);
+  const announcements = readAnnouncements(raw).filter((a) => a.id !== id);
+  await redis([["SET", ANNOUNCEMENTS_KEY, JSON.stringify(announcements)]]);
+  return send(res, 200, { announcements });
 }
 
 async function setConfig(req, res) {
@@ -264,6 +335,8 @@ module.exports = async function handler(req, res) {
     const q = req.query || {};
     if (req.method === "GET" && q.config) return await getConfig(req, res);
     if (req.method === "PUT" && q.config) return await setConfig(req, res);
+    if (req.method === "PUT" && q.announcement) return await publishAnnouncement(req, res);
+    if (req.method === "DELETE" && q.announcement) return await deleteAnnouncement(req, res);
     if (req.method === "GET" && q.admin) return await adminList(req, res);
     if (req.method === "GET") {
       const limit = Math.min(Math.max(parseInt((req.query && req.query.limit) || "150", 10) || 150, 1), 300);
