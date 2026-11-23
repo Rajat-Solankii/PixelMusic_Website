@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Listen along on PixelMusic</title>
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/site/favicon-32.png">
+<style>
+  @font-face{font-family:"Google Sans Flex";src:url(/assets/site/gflex.woff2) format("woff2");font-weight:400 850;font-display:swap}
+  :root{--bg:#fff7fa;--on-bg:#383038;--on-sv:#665c65;--p:#78527c;--on-p:#fff7fa;--pc:#f5c5f7;--on-pc:#603c65;--outline:#827781}
+  @media (prefers-color-scheme: dark){:root{--bg:#181217;--on-bg:#ece0e9;--on-sv:#cfc2cc;--p:#e5b4e8;--on-p:#47264c;--pc:#603c65;--on-pc:#f5c5f7;--outline:#998d97}}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:var(--bg);color:var(--on-bg);font-family:"Google Sans Flex",system-ui,sans-serif}
+  main{width:min(420px,100%);text-align:center}
+  img{width:104px;height:104px;border-radius:30px}
+  h1{margin:20px 0 8px;font-size:1.7rem;font-weight:750;letter-spacing:-.01em}
+  p{margin:0 0 28px;color:var(--on-sv);line-height:1.5}
+  a.btn{display:block;padding:15px 18px;border-radius:999px;text-decoration:none;font-weight:650;margin:10px 0}
+  .primary{background:var(--p);color:var(--on-p)}
+  .tonal{background:var(--pc);color:var(--on-pc)}
+  small{display:block;margin-top:18px;color:var(--on-sv)}
+  small a{color:inherit}
+</style>
+</head>
+<body>
+<main>
+  <img src="/assets/site/icon-192.png" alt="PixelMusic">
+  <h1 id="title">Your friend is listening on PixelMusic</h1>
+  <p id="sub">Install PixelMusic to listen along. Already have it? Open the song in the app.</p>
+  <a id="open" class="btn primary" href="#">Open in PixelMusic</a>
+  <a class="btn tonal" href="https://github.com/ianshulyadav/PixelMusic/releases/latest">Download PixelMusic</a>
+  <small><a href="https://www.pixelmusic.me/">What is PixelMusic?</a></small>
+</main>
+<script>
+  // The app opens these links directly when installed (Android App Links).
+  // If this page shows instead, offer an explicit "open in app" via an intent link
+  // (Chrome falls back to the download page when the app isn't installed).
+  (function () {
+    var isListen = location.pathname.indexOf("/listen") === 0;
+    if (isListen) {
+      document.title = "Listen on PixelMusic";
+      document.getElementById("title").textContent = "Listen on PixelMusic";
+      document.getElementById("sub").textContent =
+        "Install PixelMusic to play this song. Already have it? Open it in the app.";
+    }
+    var open = document.getElementById("open");
+    if (/Android/i.test(navigator.userAgent)) {
+      open.href = "intent://www.pixelmusic.me" + location.pathname + location.search +
+        "#Intent;scheme=https;package=com.unshoo.pixelmusic;S.browser_fallback_url=" +
+        encodeURIComponent("https://github.com/ianshulyadav/PixelMusic/releases/latest") + ";end";
+    } else {
+      open.style.display = "none";
+    }
+  })();
+</script>
+</body>
+</html>

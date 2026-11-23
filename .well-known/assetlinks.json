@@ -1,0 +1,22 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.unshoo.pixelmusic",
+      "sha256_cert_fingerprints": [
+        "62:FD:24:78:CA:F2:2B:3D:BC:10:29:81:7F:7C:55:84:03:C4:50:03:B9:47:B6:16:6A:86:C6:E7:7C:16:C3:D5"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.unshoo.pixelmusic.debug",
+      "sha256_cert_fingerprints": [
+        "62:FD:24:78:CA:F2:2B:3D:BC:10:29:81:7F:7C:55:84:03:C4:50:03:B9:47:B6:16:6A:86:C6:E7:7C:16:C3:D5"
+      ]
+    }
+  }
+]
